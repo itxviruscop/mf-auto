@@ -61,7 +61,7 @@ async def process_users(session, users, token, state, bot, user_id):
                 return True
             state["total_added_friends"] += 1
             if state["total_added_friends"] % 7 == 0:
-                state["messages"][-1] = f"{state['messages'][-1].split('\n')[0]}\nAdded Friends: {state['total_added_friends']}"
+                state["messages"][-1] = f"{state['messages'][-1].splitlines()[0]}\nAdded Friends: {state['total_added_friends']}"
                 await update_status_message(bot, user_id, state, f"Total Added Friends: {state['total_added_friends']}")
         await asyncio.sleep(2)  # Add a delay of 1 second between requests
         return False
@@ -178,9 +178,9 @@ async def handle_hi(callback_query, action, target):
         )
         await update_status_message(bot, user_id, state, f"Sending 'Hi' to {target}...")
         await action(token, "hi", bot, user_id)
-        state["messages"][-1] = f"{state['messages'][-1].split('\n')[0]}\n'Hi' sent to {target}."
+        state["messages"][-1] = f"{state['messages'][-1].splitlines()[0]}\n'Hi' sent to {target}."
         await update_status_message(bot, user_id, state, f"'Hi' sent to {target}.")
-        
+
     final_message = f"Total Accounts: {state['total_accounts']}\n\n" + "\n\n".join(state["messages"])
     await bot.edit_message_text(
         chat_id=user_id,
@@ -212,9 +212,9 @@ async def handle_skip(callback_query):
         )
         await update_status_message(bot, user_id, state, "Skipping chatrooms...")
         await unsubscribe_everyone(token, bot, user_id)
-        state["messages"][-1] = f"{state['messages'][-1].split('\n')[0]}\nSkipped all chatrooms."
+        state["messages"][-1] = f"{state['messages'][-1].splitlines()[0]}\nSkipped all chatrooms."
         await update_status_message(bot, user_id, state, "Skipped all chatrooms.")
-        
+
     final_message = f"Total Accounts: {state['total_accounts']}\n\n" + "\n\n".join(state["messages"])
     await bot.edit_message_text(
         chat_id=user_id,
