@@ -159,27 +159,6 @@ async def run_requests(user_id):
                     state["pinned_message_id"] = None
                 break
 
-async def fetch_account_info(token):
-    url = "https://api.meeff.com/user/login/v4"
-    payload = {
-        "os": "iOS v16.4.1", "platform": "ios", "device": "BRAND: Apple, MODEL: iPhone 14 Pro",
-        "deviceUniqueId": "6a92f1b4e7d54abc", "deviceLanguage": "en", "deviceRegion": "US",
-        "simRegion": "US", "deviceGmtOffset": "-0800", "deviceRooted": 0, "deviceEmulator": 0,
-        "appVersion": "6.3.9", "locale": "en"
-    }
-    headers = {
-        'User-Agent': "okhttp/4.12.0",
-        'Accept-Encoding': "gzip",
-        'meeff-access-token': token,
-        'content-type': "application/json; charset=utf-8"
-    }
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=json.dumps(payload), headers=headers) as response:
-            if response.status != 200:
-                logging.error(f"Failed to fetch account info: {response.status}")
-                return None
-            return (await response.json()).get('user')
-
 @router.message(Command("password"))
 async def password_command(message: types.Message):
     user_id = message.chat.id
@@ -280,9 +259,9 @@ async def invoke_command(message: types.Message):
     tokens = get_tokens(user_id)
     expired_tokens = []
     for token in tokens:
-        account_info = await fetch_account_info(token["token"])
-        if account_info is None:
-            expired_tokens.append(token)
+        # account_info = await fetch_account_info(token["token"])
+        # if account_info is None:
+        expired_tokens.append(token)
 
     if expired_tokens:
         for token in expired_tokens:
@@ -318,13 +297,11 @@ async def handle_new_token(message: types.Message):
             await message.reply("Invalid token. Please try again.")
             return
 
-        account_info = await fetch_account_info(token)
-        if account_info is None:
-            await message.reply("Failed to sign in. Token is expired or invalid.")
-            return
+        tokens = get_tokens(user_id)
+        account_name = f"Account {len(tokens) + 1}"
 
-        set_token(user_id, token, account_info['name'])
-        await message.reply("Your access token has been verified and saved. Use the menu to manage accounts.")
+        set_token(user_id, token, account_name)
+        await message.reply("Your access token has been saved as " + account_name + ". Use the menu to manage accounts.")
     else:
         await message.reply("Message text is empty. Please provide a valid token.")
 
@@ -407,19 +384,8 @@ async def callback_handler(callback_query: CallbackQuery):
         if not token:
             await callback_query.message.edit_text("No active account token found. Please set an account before requesting account info.", reply_markup=back_markup)
             return
-        account_info = await fetch_account_info(token)
-        if account_info:
-            await callback_query.message.edit_text(
-                f"<b>Name:</b> {html.escape(account_info.get('name', 'N/A'))}\n"
-                f"<b>Email:</b> {html.escape(account_info.get('email', 'N/A'))}\n"
-                f"<b>Birth Year:</b> {html.escape(str(account_info.get('birthYear', 'N/A')))}\n"
-                f"<b>Nationality:</b> {html.escape(account_info.get('nationalityCode', 'N/A'))}\n"
-                f"<b>Languages:</b> {html.escape(', '.join(account_info.get('languageCodes', [])))}\n"
-                f"<b>Description:</b> {html.escape(account_info.get('description', 'N/A'))}\n"
-                "Photos: " + ' '.join([f"<a href='{html.escape(url)}'>Photo</a>" for url in account_info.get('photoUrls', [])]),
-                parse_mode="HTML", reply_markup=back_markup)
-        else:
-            await callback_query.message.edit_text("Failed to retrieve account information.", reply_markup=back_markup)
+        # Removing the fetch account info functionality
+        await callback_query.message.edit_text("Account information display is disabled.", reply_markup=back_markup)
 
     elif callback_query.data == "back_to_menu":
         await callback_query.message.edit_text("Welcome! Use the buttons below to navigate.", reply_markup=start_markup)
