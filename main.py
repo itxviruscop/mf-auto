@@ -8,16 +8,17 @@ from aiogram import Bot, Dispatcher, Router, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from aiogram.filters import Command
 from aiogram.types.callback_query import CallbackQuery
+from datetime import datetime, timedelta
 from db import set_token, get_tokens, set_current_account, get_current_account, delete_token, set_user_filters, get_user_filters
 from lounge import send_lounge
 from chatroom import send_message_to_everyone
 from unsubscribe import unsubscribe_everyone
 from filters import filter_command, set_filter
 from aio import aio_markup, aio_callback_handler, run_requests, aio_markup_processing, user_states
-from datetime import datetime, timedelta
+from allcountry import run_all_countries
 
 # Tokens
-API_TOKEN = "7735279075:AAHvefFBqiRUE4NumS0JlwTAiSMzfrgTmqA"
+API_TOKEN = "7682628861:AAEEXyWLUiP2jOtsghWqt0bw4L65H6mwsyY"
 
 # Admin user IDs
 ADMIN_USER_IDS = [6387028671, 6816341239, 6204011131]  # Replace with actual admin user IDs
@@ -31,7 +32,7 @@ TEMP_PASSWORD = "11223344"  # Replace with your chosen password
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Initialize bot and dispatcher
+# Initialize bot, router and dispatcher
 bot = Bot(token=API_TOKEN)
 router = Router()
 dp = Dispatcher()
@@ -48,7 +49,7 @@ user_states = defaultdict(lambda: {
 start_markup = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Start Requests", callback_data="start")],
     [InlineKeyboardButton(text="Manage Accounts", callback_data="manage_accounts")],
-    [InlineKeyboardButton(text="Show Account Info", callback_data="show_account_info")]
+    [InlineKeyboardButton(text="All Countries", callback_data="all_countries")]
 ])
 
 stop_markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -61,7 +62,7 @@ back_markup = InlineKeyboardMarkup(inline_keyboard=[
 
 def is_admin(user_id):
     return user_id in ADMIN_USER_IDS
-    
+
 def has_valid_access(user_id):
     if is_admin(user_id):
         return True
@@ -100,19 +101,25 @@ async def process_users(session, users, token, user_id):
             data = await response.json()
             if data.get("errorCode") == "LikeExceeded":
                 logging.info("Daily like limit reached.")
-                await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
-                                            text=f"You've reached the daily limit. Total Added Friends: {state['total_added_friends']}. Try again tomorrow.",
-                                            reply_markup=None)
+                await bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=state["status_message_id"],
+                    text=f"You've reached the daily limit. Total Added Friends: {state['total_added_friends']}. Try again tomorrow.",
+                    reply_markup=None
+                )
                 return True
             await bot.send_message(chat_id=user_id, text=format_user_details(user), parse_mode="HTML")
             batch_added_friends += 1
             state["total_added_friends"] += 1
             if state["running"]:
-                await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
-                                            text=f"Batch: {state['batch_index']} Users Fetched: {len(users)}\n"
-                                                 f"Batch: {state['batch_index']} Added Friends: {batch_added_friends}\n"
-                                                 f"Total Added: {state['total_added_friends']}",
-                                            reply_markup=stop_markup)
+                await bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=state["status_message_id"],
+                    text=f"Batch: {state['batch_index']} Users Fetched: {len(users)}\n"
+                         f"Batch: {state['batch_index']} Added Friends: {batch_added_friends}\n"
+                         f"Total Added: {state['total_added_friends']}",
+                    reply_markup=stop_markup
+                )
             await asyncio.sleep(1)
     return False
 
@@ -125,9 +132,12 @@ async def run_requests(user_id):
             try:
                 token = get_current_account(user_id)
                 if not token:
-                    await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
-                                                text="No active account found. Please set an account before starting requests.",
-                                                reply_markup=None)
+                    await bot.edit_message_text(
+                        chat_id=user_id,
+                        message_id=state["status_message_id"],
+                        text="No active account found. Please set an account before starting requests.",
+                        reply_markup=None
+                    )
                     state["running"] = False
                     if state["pinned_message_id"]:
                         await bot.unpin_chat_message(chat_id=user_id, message_id=state["pinned_message_id"])
@@ -137,10 +147,12 @@ async def run_requests(user_id):
                 users = await fetch_users(session, token)
                 state["batch_index"] += 1
                 if not users:
-                    await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
-                                                text=f"Batch: {state['batch_index']} Users Fetched: 0\n"
-                                                     f"Total Added: {state['total_added_friends']}",
-                                                reply_markup=stop_markup)
+                    await bot.edit_message_text(
+                        chat_id=user_id,
+                        message_id=state["status_message_id"],
+                        text=f"Batch: {state['batch_index']} Users Fetched: 0\nTotal Added: {state['total_added_friends']}",
+                        reply_markup=stop_markup
+                    )
                 else:
                     if await process_users(session, users, token, user_id):
                         state["running"] = False
@@ -151,8 +163,12 @@ async def run_requests(user_id):
                 await asyncio.sleep(1)
             except Exception as e:
                 logging.error(f"Error during processing: {e}")
-                await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
-                                            text=f"An error occurred: {e}", reply_markup=None)
+                await bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=state["status_message_id"],
+                    text=f"An error occurred: {e}",
+                    reply_markup=None
+                )
                 state["running"] = False
                 if state["pinned_message_id"]:
                     await bot.unpin_chat_message(chat_id=user_id, message_id=state["pinned_message_id"])
@@ -182,7 +198,8 @@ async def start_command(message: types.Message):
         await message.reply("You are not authorized to use this bot.")
         return
     state = user_states[user_id]
-    state["status_message_id"] = (await message.answer("Welcome! Use the button below to start requests.", reply_markup=start_markup)).message_id
+    status = await message.answer("Welcome! Use the button below to start requests.", reply_markup=start_markup)
+    state["status_message_id"] = status.message_id
     state["pinned_message_id"] = None
 
 @router.message(Command("chatroom"))
@@ -257,18 +274,40 @@ async def invoke_command(message: types.Message):
         return
 
     tokens = get_tokens(user_id)
-    expired_tokens = []
-    for token in tokens:
-        # account_info = await fetch_account_info(token["token"])
-        # if account_info is None:
-        expired_tokens.append(token)
+    if not tokens:
+        await message.reply("No tokens found.")
+        return
 
-    if expired_tokens:
-        for token in expired_tokens:
-            delete_token(user_id, token["token"])
-            await message.reply(f"Deleted expired token for account: {token['name']}")
+    disabled_accounts = []
+    working_accounts = []
+    url = "https://api.meeff.com/facetalk/vibemeet/history/count/v1"
+    params = {'locale': "en"}
+
+    async with aiohttp.ClientSession() as session:
+        for token_obj in tokens:
+            token = token_obj["token"]
+            headers = {
+                'User-Agent': "okhttp/5.0.0-alpha.14",
+                'Accept-Encoding': "gzip",
+                'meeff-access-token': token
+            }
+            try:
+                async with session.get(url, params=params, headers=headers) as resp:
+                    result = await resp.json(content_type=None)
+                    if "errorCode" in result and result["errorCode"] == "AuthRequired":
+                        disabled_accounts.append(token_obj)
+                    else:
+                        working_accounts.append(token_obj)
+            except Exception as e:
+                logging.error(f"Error checking token {token_obj.get('name')}: {e}")
+                disabled_accounts.append(token_obj)
+
+    if disabled_accounts:
+        for token_obj in disabled_accounts:
+            delete_token(user_id, token_obj["token"])
+            await message.reply(f"Deleted disabled token for account: {token_obj['name']}")
     else:
-        await message.reply("No expired tokens found.")
+        await message.reply("All accounts are working.")
 
 @router.message(Command("aio"))
 async def aio_command(message: types.Message):
@@ -282,26 +321,45 @@ async def handle_new_token(message: types.Message):
     if message.text and message.text.startswith("/"):
         return
     user_id = message.from_user.id
-    
+
     # Ignore bot's own messages
     if message.from_user.is_bot:
         return
-    
+
     if not has_valid_access(user_id):
         await message.reply("You are not authorized to use this bot.")
         return
-    
+
     if message.text:
         token = message.text.strip()
         if len(token) < 10:
             await message.reply("Invalid token. Please try again.")
             return
 
+        # Verify the token by hitting the history count endpoint
+        url = "https://api.meeff.com/facetalk/vibemeet/history/count/v1"
+        params = {'locale': "en"}
+        headers = {
+            'User-Agent': "okhttp/5.0.0-alpha.14",
+            'Accept-Encoding': "gzip",
+            'meeff-access-token': token
+        }
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(url, params=params, headers=headers) as resp:
+                    result = await resp.json(content_type=None)
+                    if "errorCode" in result and result["errorCode"] == "AuthRequired":
+                        await message.reply("The token you provided is invalid or disabled. Please try a different token.")
+                        return
+            except Exception as e:
+                logging.error(f"Error verifying token: {e}")
+                await message.reply("Error verifying the token. Please try again.")
+                return
+
         tokens = get_tokens(user_id)
         account_name = f"Account {len(tokens) + 1}"
-
         set_token(user_id, token, account_name)
-        await message.reply("Your access token has been saved as " + account_name + ". Use the menu to manage accounts.")
+        await message.reply("Your access token has been verified and saved as " + account_name + ". Use the menu to manage accounts.")
     else:
         await message.reply("Message text is empty. Please provide a valid token.")
 
@@ -379,13 +437,27 @@ async def callback_handler(callback_query: CallbackQuery):
                 await bot.unpin_chat_message(chat_id=user_id, message_id=state["pinned_message_id"])
                 state["pinned_message_id"] = None
 
-    elif callback_query.data == "show_account_info":
-        token = get_current_account(user_id)
-        if not token:
-            await callback_query.message.edit_text("No active account token found. Please set an account before requesting account info.", reply_markup=back_markup)
-            return
-        # Removing the fetch account info functionality
-        await callback_query.message.edit_text("Account information display is disabled.", reply_markup=back_markup)
+    elif callback_query.data == "all_countries":
+        # Start the All Countries feature
+        if state["running"]:
+            await callback_query.answer("Another process is already running!")
+        else:
+            state["running"] = True
+            try:
+                status_message = await callback_query.message.edit_text(
+                    "Starting All Countries feature...",
+                    reply_markup=stop_markup
+                )
+                state["status_message_id"] = status_message.message_id
+                state["pinned_message_id"] = status_message.message_id
+                state["stop_markup"] = stop_markup  # Save the stop button markup for later updates
+                await bot.pin_chat_message(chat_id=user_id, message_id=status_message.message_id)
+                asyncio.create_task(run_all_countries(user_id, state, bot, get_current_account))
+                await callback_query.answer("All Countries feature started!")
+            except Exception as e:
+                logging.error(f"Error while starting All Countries feature: {e}")
+                await callback_query.message.edit_text("Failed to start All Countries feature.", reply_markup=start_markup)
+                state["running"] = False
 
     elif callback_query.data == "back_to_menu":
         await callback_query.message.edit_text("Welcome! Use the buttons below to navigate.", reply_markup=start_markup)
@@ -398,9 +470,9 @@ async def set_bot_commands():
         BotCommand(command="start", description="Start the bot"),
         BotCommand(command="lounge", description="Send message to everyone in the lounge"),
         BotCommand(command="chatroom", description="Send a message to everyone"),
-        BotCommand(command="aio", description="Show aio commands"),  # Reorder aio command
+        BotCommand(command="aio", description="Show aio commands"),
         BotCommand(command="filter", description="Set filter preferences"),
-        BotCommand(command="invoke", description="Invoke expired token cleanup"),
+        BotCommand(command="invoke", description="Verify and remove disabled accounts"),
         BotCommand(command="skip", description="Skip everyone in the chatroom"),
         BotCommand(command="password", description="Enter password for temporary access")
     ]
