@@ -8,14 +8,13 @@ from aiogram import Bot, Dispatcher, Router, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from aiogram.filters import Command
 from aiogram.types.callback_query import CallbackQuery
-from datetime import datetime, timedelta
 from db import set_token, get_tokens, set_current_account, get_current_account, delete_token, set_user_filters, get_user_filters
 from lounge import send_lounge
 from chatroom import send_message_to_everyone
 from unsubscribe import unsubscribe_everyone
 from filters import filter_command, set_filter
 from aio import aio_markup, aio_callback_handler, run_requests, aio_markup_processing, user_states
-from allcountry import run_all_countries
+from datetime import datetime, timedelta
 
 # Tokens
 API_TOKEN = "7735279075:AAHvefFBqiRUE4NumS0JlwTAiSMzfrgTmqA"
@@ -32,7 +31,7 @@ TEMP_PASSWORD = "11223344"  # Replace with your chosen password
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Initialize bot, router and dispatcher
+# Initialize bot and dispatcher
 bot = Bot(token=API_TOKEN)
 router = Router()
 dp = Dispatcher()
@@ -49,7 +48,7 @@ user_states = defaultdict(lambda: {
 start_markup = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Start Requests", callback_data="start")],
     [InlineKeyboardButton(text="Manage Accounts", callback_data="manage_accounts")],
-    [InlineKeyboardButton(text="All Countries", callback_data="all_countries")]
+    [InlineKeyboardButton(text="Show Account Info", callback_data="show_account_info")]
 ])
 
 stop_markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -101,25 +100,19 @@ async def process_users(session, users, token, user_id):
             data = await response.json()
             if data.get("errorCode") == "LikeExceeded":
                 logging.info("Daily like limit reached.")
-                await bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=state["status_message_id"],
-                    text=f"You've reached the daily limit. Total Added Friends: {state['total_added_friends']}. Try again tomorrow.",
-                    reply_markup=None
-                )
+                await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
+                                            text=f"You've reached the daily limit. Total Added Friends: {state['total_added_friends']}. Try again tomorrow.",
+                                            reply_markup=None)
                 return True
             await bot.send_message(chat_id=user_id, text=format_user_details(user), parse_mode="HTML")
             batch_added_friends += 1
             state["total_added_friends"] += 1
             if state["running"]:
-                await bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=state["status_message_id"],
-                    text=f"Batch: {state['batch_index']} Users Fetched: {len(users)}\n"
-                         f"Batch: {state['batch_index']} Added Friends: {batch_added_friends}\n"
-                         f"Total Added: {state['total_added_friends']}",
-                    reply_markup=stop_markup
-                )
+                await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
+                                            text=f"Batch: {state['batch_index']} Users Fetched: {len(users)}\n"
+                                                 f"Batch: {state['batch_index']} Added Friends: {batch_added_friends}\n"
+                                                 f"Total Added: {state['total_added_friends']}",
+                                            reply_markup=stop_markup)
             await asyncio.sleep(1)
     return False
 
@@ -132,12 +125,9 @@ async def run_requests(user_id):
             try:
                 token = get_current_account(user_id)
                 if not token:
-                    await bot.edit_message_text(
-                        chat_id=user_id,
-                        message_id=state["status_message_id"],
-                        text="No active account found. Please set an account before starting requests.",
-                        reply_markup=None
-                    )
+                    await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
+                                                text="No active account found. Please set an account before starting requests.",
+                                                reply_markup=None)
                     state["running"] = False
                     if state["pinned_message_id"]:
                         await bot.unpin_chat_message(chat_id=user_id, message_id=state["pinned_message_id"])
@@ -147,12 +137,10 @@ async def run_requests(user_id):
                 users = await fetch_users(session, token)
                 state["batch_index"] += 1
                 if not users:
-                    await bot.edit_message_text(
-                        chat_id=user_id,
-                        message_id=state["status_message_id"],
-                        text=f"Batch: {state['batch_index']} Users Fetched: 0\nTotal Added: {state['total_added_friends']}",
-                        reply_markup=stop_markup
-                    )
+                    await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
+                                                text=f"Batch: {state['batch_index']} Users Fetched: 0\n"
+                                                     f"Total Added: {state['total_added_friends']}",
+                                                reply_markup=stop_markup)
                 else:
                     if await process_users(session, users, token, user_id):
                         state["running"] = False
@@ -163,12 +151,8 @@ async def run_requests(user_id):
                 await asyncio.sleep(1)
             except Exception as e:
                 logging.error(f"Error during processing: {e}")
-                await bot.edit_message_text(
-                    chat_id=user_id,
-                    message_id=state["status_message_id"],
-                    text=f"An error occurred: {e}",
-                    reply_markup=None
-                )
+                await bot.edit_message_text(chat_id=user_id, message_id=state["status_message_id"],
+                                            text=f"An error occurred: {e}", reply_markup=None)
                 state["running"] = False
                 if state["pinned_message_id"]:
                     await bot.unpin_chat_message(chat_id=user_id, message_id=state["pinned_message_id"])
@@ -395,22 +379,13 @@ async def callback_handler(callback_query: CallbackQuery):
                 await bot.unpin_chat_message(chat_id=user_id, message_id=state["pinned_message_id"])
                 state["pinned_message_id"] = None
 
-    elif callback_query.data == "all_countries":
-        if state["running"]:
-            await callback_query.answer("Another process is already running!")
-        else:
-            state["running"] = True
-            try:
-                status_message = await callback_query.message.edit_text("Starting All Countries feature...", reply_markup=stop_markup)
-                state["status_message_id"] = status_message.message_id
-                state["pinned_message_id"] = status_message.message_id
-                await bot.pin_chat_message(chat_id=user_id, message_id=status_message.message_id)
-                asyncio.create_task(run_all_countries(user_id, state, bot, get_current_account))
-                await callback_query.answer("All Countries feature started!")
-            except Exception as e:
-                logging.error(f"Error while starting All Countries feature: {e}")
-                await callback_query.message.edit_text("Failed to start All Countries feature.", reply_markup=start_markup)
-                state["running"] = False
+    elif callback_query.data == "show_account_info":
+        token = get_current_account(user_id)
+        if not token:
+            await callback_query.message.edit_text("No active account token found. Please set an account before requesting account info.", reply_markup=back_markup)
+            return
+        # Removing the fetch account info functionality
+        await callback_query.message.edit_text("Account information display is disabled.", reply_markup=back_markup)
 
     elif callback_query.data == "back_to_menu":
         await callback_query.message.edit_text("Welcome! Use the buttons below to navigate.", reply_markup=start_markup)
@@ -423,7 +398,7 @@ async def set_bot_commands():
         BotCommand(command="start", description="Start the bot"),
         BotCommand(command="lounge", description="Send message to everyone in the lounge"),
         BotCommand(command="chatroom", description="Send a message to everyone"),
-        BotCommand(command="aio", description="Show aio commands"),
+        BotCommand(command="aio", description="Show aio commands"),  # Reorder aio command
         BotCommand(command="filter", description="Set filter preferences"),
         BotCommand(command="invoke", description="Invoke expired token cleanup"),
         BotCommand(command="skip", description="Skip everyone in the chatroom"),
