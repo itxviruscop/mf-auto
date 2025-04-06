@@ -331,7 +331,8 @@ async def handle_new_token(message: types.Message):
         return
 
     if message.text:
-        token = message.text.strip()
+        token_data = message.text.strip().split(" ")
+        token = token_data[0]
         if len(token) < 10:
             await message.reply("Invalid token. Please try again.")
             return
@@ -357,9 +358,9 @@ async def handle_new_token(message: types.Message):
                 return
 
         tokens = get_tokens(user_id)
-        account_name = f"Account {len(tokens) + 1}"
+        account_name = " ".join(token_data[1:]) if len(token_data) > 1 else f"Account {len(tokens) + 1}"
         set_token(user_id, token, account_name)
-        await message.reply("Your access token has been verified and saved as " + account_name + ". Use the menu to manage accounts.")
+        await message.reply(f"Your access token has been verified and saved as {account_name}. Use the menu to manage accounts.")
     else:
         await message.reply("Message text is empty. Please provide a valid token.")
 
