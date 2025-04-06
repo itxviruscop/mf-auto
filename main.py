@@ -18,7 +18,7 @@ from aio import aio_markup, aio_callback_handler, run_requests, aio_markup_proce
 from allcountry import run_all_countries
 
 # Tokens
-API_TOKEN = "7735279075:AAHvefFBqiRUE4NumS0JlwTAiSMzfrgTmqA"
+API_TOKEN = "7682628861:AAEEXyWLUiP2jOtsghWqt0bw4L65H6mwsyY"
 
 # Admin user IDs
 ADMIN_USER_IDS = [6387028671, 6816341239, 6204011131]  # Replace with actual admin user IDs
