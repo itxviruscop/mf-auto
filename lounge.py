@@ -64,14 +64,18 @@ async def handle_user(token, user, messages, bot, chat_id, status_message):
     chatroom_id = await open_chatroom(token, user_id)
     if chatroom_id:
         for message in messages:
-            await send_message(token, chatroom_id, message)
+            await send_message(token, chatroom_id, message.strip())  # Strip whitespace around each message
         user_name = user["user"].get("name", "Unknown User")
         logging.info(f"Sent messages to {user_name} in chatroom {chatroom_id}.")
         return True
     else:
         return False
 
-async def send_lounge(token, messages=["hi"], status_message=None, bot=None, chat_id=None):
+async def send_lounge(token, messages="hi", status_message=None, bot=None, chat_id=None):
+    # Ensure messages is a list, even if a single string is provided
+    if isinstance(messages, str):
+        messages = [msg.strip() for msg in messages.split(",")]  # Split by commas and strip whitespace
+
     sent_count = 0
     total_users = 0
 
