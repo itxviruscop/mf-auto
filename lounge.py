@@ -59,18 +59,19 @@ async def send_message(token, chatroom_id, message):
                 return None
             return await response.json()
 
-async def handle_user(token, user, message, bot, chat_id, status_message):
+async def handle_user(token, user, messages, bot, chat_id, status_message):
     user_id = user["user"]["_id"]
     chatroom_id = await open_chatroom(token, user_id)
     if chatroom_id:
-        await send_message(token, chatroom_id, message)
+        for message in messages:
+            await send_message(token, chatroom_id, message)
         user_name = user["user"].get("name", "Unknown User")
-        logging.info(f"Sent message to {user_name} in chatroom {chatroom_id}.")
+        logging.info(f"Sent messages to {user_name} in chatroom {chatroom_id}.")
         return True
     else:
         return False
 
-async def send_lounge(token, message="hi", status_message=None, bot=None, chat_id=None):
+async def send_lounge(token, messages=["hi"], status_message=None, bot=None, chat_id=None):
     sent_count = 0
     total_users = 0
 
@@ -81,7 +82,7 @@ async def send_lounge(token, message="hi", status_message=None, bot=None, chat_i
             break
 
         total_users += len(users)
-        tasks = [handle_user(token, user, message, bot, chat_id, status_message) for user in users]
+        tasks = [handle_user(token, user, messages, bot, chat_id, status_message) for user in users]
         results = await asyncio.gather(*tasks)
 
         sent_count += sum(results)
@@ -91,7 +92,7 @@ async def send_lounge(token, message="hi", status_message=None, bot=None, chat_i
             await bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=status_message.message_id,
-                text=f"Lounge Users: {total_users} Message sent: {sent_count}",
+                text=f"Lounge Users: {total_users} Messages sent: {sent_count}",
             )
 
         if disabled_users == len(users):
